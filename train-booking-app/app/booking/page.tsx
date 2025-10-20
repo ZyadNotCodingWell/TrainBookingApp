@@ -65,22 +65,38 @@ export default function BookingPage() {
       return;
     }
 
-    // Mock route data - in real app, fetch from API
-    const mockRoute: Route = {
-      id: routeId,
-      departureTime: "2024-01-15T08:00:00Z",
-      arrivalTime: "2024-01-15T10:30:00Z",
-      price: price,
-      train: { id: "t1", name: "Express 101", capacity: 200 },
-      departureStation: { id: "s1", name: "Gare du Nord", city: "Paris" },
-      arrivalStation: { id: "s2", name: "Gare de Lyon", city: "Lyon" },
+    // Fetch train data from API
+    const fetchTrain = async () => {
+      try {
+        const response = await fetch(`/api/trains/${routeId}`);
+        if (!response.ok) {
+          throw new Error('Train not found');
+        }
+        const train = await response.json();
+
+        // Transform to route format
+        const routeData: Route = {
+          id: train.id.toString(),
+          departureTime: new Date(`${train.departureDate.split('T')[0]}T${train.departureHour}`).toISOString(),
+          arrivalTime: new Date(`${train.departureDate.split('T')[0]}T${train.departureHour}`).toISOString(), // Simplified
+          price: train.price,
+          train: { id: train.id.toString(), name: `Train ${train.id}`, capacity: train.remainingPlaces + 10 },
+          departureStation: { id: `dep-${train.id}`, name: `Gare ${train.departureCity}`, city: train.departureCity },
+          arrivalStation: { id: `arr-${train.id}`, name: `Gare ${train.arrivalCity}`, city: train.arrivalCity },
+        };
+        setRoute(routeData);
+      } catch (error) {
+        console.error('Error fetching train:', error);
+        router.push('/');
+      }
     };
-    setRoute(mockRoute);
+
+    fetchTrain();
   }, [routeId, router]);
 
   const calculateTotal = () => {
     let total = route?.price || 0;
-    let breakdown = [`Prix de base: ${route?.price || 0}€`];
+    const breakdown = [`Prix de base: ${route?.price || 0}€`];
 
     if (form.comfortSeat) {
       total += 2.99;
@@ -112,7 +128,7 @@ export default function BookingPage() {
     return { total: total.toFixed(2), breakdown };
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (form.email !== form.emailConfirm) {
@@ -120,18 +136,46 @@ export default function BookingPage() {
       return;
     }
 
-    // Generate PDF-like output
-    const { total, breakdown } = calculateTotal();
-    const bookingDetails = {
-      ...form,
-      route,
-      total,
-      breakdown,
-      bookingDate: new Date().toISOString(),
-    };
+    try {
+      const { total } = calculateTotal();
+      const bookingData = {
+        trainId: parseInt(route!.id),
+        seats: 1, // Simplified, assuming 1 seat per booking
+        totalPrice: parseFloat(total),
+        passengerInfo: {
+          title: form.title,
+          firstName: form.firstName,
+          lastName: form.lastName,
+          phone: form.phone,
+          email: form.email,
+        },
+        options: {
+          comfortSeat: form.comfortSeat,
+          electricPlug: form.electricPlug,
+          extraLuggage: form.extraLuggage,
+          smsBriefing: form.smsBriefing,
+          travelInsurance: form.travelInsurance,
+        },
+        memberId: form.memberId || null,
+      };
 
-    // Mock PDF generation - in real app, use a PDF library
-    const pdfContent = `
+      const response = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(bookingData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Booking failed');
+      }
+
+      const booking = await response.json();
+
+      // Generate PDF-like output
+      const { breakdown } = calculateTotal();
+      const pdfContent = `
 TRAIN BOOKING CONFIRMATION
 
 Route: ${route?.departureStation.city} → ${route?.arrivalStation.city}
@@ -153,13 +197,17 @@ Total Price: ${total}€
 Booking Date: ${new Date().toLocaleString()}
 
 Thank you for your booking!
-    `;
+      `;
 
-    // Display PDF content in alert (mock)
-    alert('PDF généré:\n\n' + pdfContent);
+      // Display PDF content in alert (mock)
+      alert('PDF généré:\n\n' + pdfContent);
 
-    // In real app, redirect to confirmation page
-    router.push('/bookings');
+      // Redirect to bookings page
+      router.push('/bookings');
+    } catch (error) {
+      console.error('Booking error:', error);
+      alert('Erreur lors de la réservation. Veuillez réessayer.');
+    }
   };
 
   if (!route) {
@@ -321,7 +369,7 @@ Thank you for your booking!
         <div className="bg-yellow-100 p-4 rounded border-l-4 border-yellow-500">
           <p className="text-sm text-yellow-800">
             <strong>⚠️ Attention:</strong> Les informations bancaires sont désactivées dans cette démonstration.
-            Aucun paiement réel n'est traité. Ne saisissez jamais d'informations bancaires sensibles dans une application de démonstration.
+            Aucun paiement réel n&apos;est traité. Ne saisissez jamais d&apos;informations bancaires sensibles dans une application de démonstration.
           </p>
         </div>
 
@@ -339,7 +387,7 @@ Thank you for your booking!
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">Date d'expiration</label>
+              <label className="block text-sm font-medium mb-2">Date d&apos;expiration</label>
               <input
                 type="text"
                 placeholder="MM/AA"

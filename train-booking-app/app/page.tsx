@@ -35,68 +35,39 @@ export default function HomePage() {
     e.preventDefault();
     setLoading(true);
 
-    // Mock search - in real app, this would call an API
-    const mockRoutes: Route[] = [
-      {
-        id: "1",
-        departureTime: "2024-01-15T08:00:00Z",
-        arrivalTime: "2024-01-15T10:30:00Z",
-        price: 45,
-        train: { id: "t1", name: "Express 101", capacity: 200 },
-        departureStation: { id: "s1", name: "Gare du Nord", city: "Paris" },
-        arrivalStation: { id: "s2", name: "Gare de Lyon", city: "Lyon" },
-      },
-      {
-        id: "2",
-        departureTime: "2024-01-15T14:00:00Z",
-        arrivalTime: "2024-01-15T16:30:00Z",
-        price: 50,
-        train: { id: "t2", name: "Rapide 202", capacity: 150 },
-        departureStation: { id: "s1", name: "Gare du Nord", city: "Paris" },
-        arrivalStation: { id: "s2", name: "Gare de Lyon", city: "Lyon" },
-      },
-      {
-        id: "1",
-        departureTime: "2024-01-15T08:00:00Z",
-        arrivalTime: "2024-01-15T10:30:00Z",
-        price: 45,
-        train: { id: "t1", name: "Express 101", capacity: 200 },
-        departureStation: { id: "s1", name: "Gare du Nord", city: "Paris" },
-        arrivalStation: { id: "s2", name: "Gare de Lyon", city: "Lyon" },
-      },
-      {
-        id: "2",
-        departureTime: "2024-01-15T14:00:00Z",
-        arrivalTime: "2024-01-15T16:30:00Z",
-        price: 50,
-        train: { id: "t2", name: "Rapide 202", capacity: 150 },
-        departureStation: { id: "s1", name: "Gare du Nord", city: "Paris" },
-        arrivalStation: { id: "s2", name: "Gare de Lyon", city: "Lyon" },
-      },
-      {
-        id: "1",
-        departureTime: "2024-01-15T08:00:00Z",
-        arrivalTime: "2024-01-15T10:30:00Z",
-        price: 45,
-        train: { id: "t1", name: "Express 101", capacity: 200 },
-        departureStation: { id: "s1", name: "Gare du Nord", city: "Paris" },
-        arrivalStation: { id: "s2", name: "Gare de Lyon", city: "Lyon" },
-      },
-      {
-        id: "2",
-        departureTime: "2024-01-15T14:00:00Z",
-        arrivalTime: "2024-01-15T16:30:00Z",
-        price: 50,
-        train: { id: "t2", name: "Rapide 202", capacity: 150 },
-        departureStation: { id: "s1", name: "Gare du Nord", city: "Paris" },
-        arrivalStation: { id: "s2", name: "Gare de Lyon", city: "Lyon" },
-      },
-    ];
+    try {
+      const response = await fetch(`/api/trains?departureCity=${encodeURIComponent(departure)}&arrivalCity=${encodeURIComponent(arrival)}${date ? `&date=${date}` : ''}`);
+      if (!response.ok) {
+        throw new Error('Search failed');
+      }
+      const trains = await response.json();
 
-    setTimeout(() => {
-      setRoutes(mockRoutes);
+      // Transform trains to routes format for display
+      const transformedRoutes: Route[] = trains.map((train: {
+        id: number;
+        departureCity: string;
+        arrivalCity: string;
+        departureDate: string;
+        departureHour: string;
+        price: number;
+        remainingPlaces: number;
+      }) => ({
+        id: train.id.toString(),
+        departureTime: new Date(`${train.departureDate.split('T')[0]}T${train.departureHour}`).toISOString(),
+        arrivalTime: new Date(`${train.departureDate.split('T')[0]}T${train.departureHour}`).toISOString(), // Simplified, would need actual arrival calculation
+        price: train.price,
+        train: { id: train.id.toString(), name: `Train ${train.id}`, capacity: train.remainingPlaces + 10 }, // Simplified
+        departureStation: { id: `dep-${train.id}`, name: `Gare ${train.departureCity}`, city: train.departureCity },
+        arrivalStation: { id: `arr-${train.id}`, name: `Gare ${train.arrivalCity}`, city: train.arrivalCity },
+      }));
+
+      setRoutes(transformedRoutes);
+    } catch (error) {
+      console.error('Search error:', error);
+      setRoutes([]);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   const handleBook = (routeId: string) => {

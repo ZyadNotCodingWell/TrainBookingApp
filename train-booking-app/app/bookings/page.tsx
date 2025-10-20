@@ -55,14 +55,19 @@ export default function MyBookingsPage() {
 
     const fetchBookings = async () => {
       try {
-        const res = await fetch("/api/bookings");
+        const res = await fetch("/api/bookings", {
+          headers: {
+            'Authorization': `Bearer ${session.user?.email}`, // Simplified auth, should use proper JWT
+          },
+        });
         if (!res.ok) {
           throw new Error("Erreur lors de la récupération de vos réservations.");
         }
         const data: Booking[] = await res.json();
         setBookings(data);
-      } catch (err: any) {
-        setError(err.message || "Une erreur inattendue est survenue.");
+      } catch (err: unknown) {
+        const error = err as Error;
+        setError(error.message || "Une erreur inattendue est survenue.");
       } finally {
         setLoading(false);
       }
@@ -83,7 +88,7 @@ export default function MyBookingsPage() {
     <div className="container mx-auto p-4 overflow-y-scroll h-screen">
       <h1 className="text-3xl font-bold mb-6 text-center">Mes Réservations</h1>
       {bookings.length === 0 ? (
-        <p className="text-center">Vous n'avez pas encore de réservations.</p>
+        <p className="text-center">Vous n&apos;avez pas encore de réservations.</p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {bookings.map((booking) => (
