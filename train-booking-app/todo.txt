@@ -1,0 +1,206 @@
+# 🚀 Project Setup To-Do — Next.js + Prisma + Postgres (Train Booking Example)
+
+This document walks you through creating and seeding a Postgres database with Prisma in a Next.js project.
+
+---
+
+## 🧱 1. Install Dependencies
+
+```bash
+npm install @prisma/client
+npm install -D prisma ts-node date-fns
+⚙️ 2. Initialize Prisma
+bash
+Copier le code
+npx prisma init
+This creates a /prisma folder and a .env file.
+
+In .env, set your database connection string:
+
+ini
+Copier le code
+DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/DATABASE_NAME?schema=public"
+🗂️ 3. Update prisma/schema.prisma
+Create or replace the contents of /prisma/schema.prisma:
+
+prisma
+Copier le code
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  email         String @id @unique
+  passwordHash  String
+  accountNumber String
+}
+
+model Train {
+  id               Int      @id @default(autoincrement())
+  departureCity    String
+  arrivalCity      String
+  departureDate    DateTime
+  departureHour    String
+  price            Float
+  remainingPlaces  Int
+}
+🧩 4. Run Migration
+bash
+Copier le code
+npx prisma migrate dev --name init
+This creates the User and Train tables in your Postgres database.
+
+🌱 5. Create Seed Script
+File: /prisma/seed.ts
+
+ts
+Copier le code
+import { PrismaClient } from "@prisma/client";
+import { addDays } from "date-fns";
+
+const prisma = new PrismaClient();
+
+const cities = [
+  "Paris",
+  "Lyon",
+  "Marseille",
+  "Toulouse",
+  "Bordeaux",
+  "Lille",
+  "Nantes",
+  "Strasbourg",
+  "Nice",
+  "Montpellier",
+];
+
+function getRandomCityPair() {
+  let from = cities[Math.floor(Math.random() * cities.length)];
+  let to = cities[Math.floor(Math.random() * cities.length)];
+  while (to === from) {
+    to = cities[Math.floor(Math.random() * cities.length)];
+  }
+  return { from, to };
+}
+
+function getRandomHour() {
+  const hours = Math.floor(Math.random() * 24);
+  const minutes = Math.random() < 0.5 ? "00" : "30";
+  return `${hours.toString().padStart(2, "0")}:${minutes}`;
+}
+
+async function main() {
+  console.log("🌱 Seeding trains...");
+
+  for (let i = 0; i < 15; i++) {
+    const { from, to } = getRandomCityPair();
+    const date = addDays(new Date(), Math.floor(Math.random() * 20));
+    const hour = getRandomHour();
+    const price = parseFloat((20 + Math.random() * 80).toFixed(2));
+    const remainingPlaces = Math.floor(10 + Math.random() * 90);
+
+    await prisma.train.create({
+      data: {
+        departureCity: from,
+        arrivalCity: to,
+        departureDate: date,
+        departureHour: hour,
+        price,
+        remainingPlaces,
+      },
+    });
+  }
+
+  console.log("✅ Seeding done.");
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+🔧 6. Update package.json for Seeding
+In your package.json, add:
+
+json
+Copier le code
+"prisma": {
+  "seed": "ts-node prisma/seed.ts"
+}
+Then run:
+
+bash
+Copier le code
+npx prisma db seed
+🧠 7. Prisma Client Helper
+File: /lib/prisma.ts
+
+ts
+Copier le code
+import { PrismaClient } from "@prisma/client";
+
+const globalForPrisma = global as unknown as { prisma: PrismaClient };
+
+export const prisma =
+  globalForPrisma.prisma ||
+  new PrismaClient({
+    log: ["query"],
+  });
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+🌐 8. Example API Route (Optional)
+File: /app/api/trains/route.ts
+
+ts
+Copier le code
+import { prisma } from "@/lib/prisma";
+
+export async function GET() {
+  const trains = await prisma.train.findMany({
+    orderBy: { departureDate: "asc" },
+  });
+  return Response.json(trains);
+}
+🧾 9. Quick SQL Reference (if needed)
+If you want to check or create the tables manually in Postgres:
+
+sql
+Copier le code
+CREATE TABLE "User" (
+  email TEXT PRIMARY KEY,
+  passwordHash TEXT NOT NULL,
+  accountNumber TEXT NOT NULL
+);
+
+CREATE TABLE "Train" (
+  id SERIAL PRIMARY KEY,
+  departureCity TEXT NOT NULL,
+  arrivalCity TEXT NOT NULL,
+  departureDate TIMESTAMP NOT NULL,
+  departureHour TEXT NOT NULL,
+  price NUMERIC(6,2) NOT NULL,
+  remainingPlaces INT NOT NULL
+);
+✅ 10. Final Checklist
+ .env configured with Postgres URL
+
+ Prisma schema updated
+
+ Migration run (npx prisma migrate dev --name init)
+
+ Seed script tested (npx prisma db seed)
+
+ lib/prisma.ts added
+
+ API routes fetching data working
+
+You’re ready to start building your Next.js app on top of this clean database setup 🚄
+
+End of To-Do
